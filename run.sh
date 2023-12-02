@@ -13,7 +13,7 @@ else
     txt="$2"
 fi
 
-src=(solutions/$aoc_*.hs)
+src=(solutions/${aoc}_*.hs)
 
 num_srcs=${#src[@]}
 if [ "$num_srcs" -ne 1 ]; then
