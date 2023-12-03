@@ -25,7 +25,7 @@ score game = if allAllowed then gameNumber else 0
 -- Part 2.
 
 answer2 :: [String] -> Int
-answer2 games = foldl (+) 0 (map power (map fewest games))
+answer2 games = foldl (+) 0 (map (power . fewest) games)
 
 power :: (Int, Int, Int) -> Int
 power (r, g, b) = r * g * b
@@ -50,8 +50,7 @@ parseDraw draw = (match 'r', match 'g', match 'b')
     where
         shows = map (drop 1) (splitAll ',' draw)
         parts = map (split ' ') shows
-        predicate c (_, rhs) = (head rhs) == c
-        match c = unwrap (find (predicate c) parts)
+        match c = unwrap (find (\(_, rhs) -> head rhs == c) parts)
         unwrap x = case x of
             Just (n, _) -> read n :: Int
             Nothing -> 0
@@ -61,6 +60,4 @@ split ch s = (lhs, drop 1 rhs) where (lhs, rhs) = break (== ch) s
 
 splitAll :: Char -> String -> [String]
 splitAll ch "" = []
-splitAll ch s = lhs : (splitAll ch rhs)
-    where
-        (lhs, rhs) = split ch s
+splitAll ch s = lhs : (splitAll ch rhs) where (lhs, rhs) = split ch s
