@@ -16,11 +16,10 @@ answer1 :: [String] -> Int
 answer1 games = foldl (+) 0 (map score games)
 
 score :: String -> Int
-score game = if allAllowed then gameNumber else 0
+score game = if (find (disallowed) draws) == Nothing then gameNumber else 0
     where
         (gameNumber, draws) = parseGame game
         disallowed (r, g, b) = r > 12 || g > 13 || b > 14
-        allAllowed = (find (disallowed) draws) == Nothing
         
 -- Part 2.
 
