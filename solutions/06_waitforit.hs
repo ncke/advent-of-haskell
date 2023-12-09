@@ -7,26 +7,23 @@ main = do
     let races = parseRaces (lines input)
     print (answer1 races)
     print (answer2 races)
-    print (races)
 
 -- Part 1.
 
 answer1 races = foldl (*) 1 (map ways races)
 
 -- Rewritten as a quadratic equation, the push length p required to beat
--- a distance d in a race of length r is: (-p)^2 + rp -d > 0.
--- Use the quadratic equation to solve for the lowest winning push length 
--- and highest winning push length, and compute the number of ways to win.
+-- a distance d in a race of length r is: (-p)^2 + rp - d > 0. Use the
+-- quadratic equation to solve for the lowest winning push length and
+-- highest winning push length, and compute the number of ways to win.
 ways :: (Double, Double) -> Int
 ways (raceLen, minDist) = highPush - lowPush + 1
     where
         above n = (ceiling n) + (if floor n == ceiling n then 1 else 0)
         below n = (floor n) - (if floor n == ceiling n then 1 else 0)
-        det = sqrt ( raceLen * raceLen - 4.0 * (minDist) )
-        quad1 = (-raceLen + det) / (-2.0)
-        quad2 = (-raceLen - det) / (-2.0)
-        lowPush = above quad1
-        highPush = below quad2
+        det = sqrt (raceLen * raceLen - 4.0 * minDist)
+        lowPush = above ((-raceLen + det) / (-2.0))
+        highPush = below ((-raceLen - det) / (-2.0))
 
 -- Part 2.
 
