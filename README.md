@@ -17,3 +17,4 @@ Solving advent of code problems in Haskell.
 |09 |⭐️⭐️|
 |10|⭐️ |
 |11|⭐️⭐️|
+|12|⭐️ |
