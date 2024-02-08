@@ -1,115 +1,179 @@
 import Data.List
 import qualified Data.Map as Map
-import Data.Maybe (fromJust, isJust)
+import Data.Maybe (fromJust, fromMaybe, isJust)
 import System.Environment (getArgs)
 
+-- Workflows.
+
 type WorkflowName = String
+
 data Operator = LESS | GREATER deriving (Eq, Show)
+
 data Goto = GotoName WorkflowName | ACCEPT | REJECT deriving (Eq, Show)
+
 data Rule = Rule Char Operator Int Goto deriving (Eq, Show)
+
 data Workflow = Workflow WorkflowName [Rule] Goto deriving (Eq, Show)
+
+type WorkflowGetter = (WorkflowName -> Workflow)
+
+get_workflow_named :: Map.Map WorkflowName Workflow -> WorkflowGetter
+get_workflow_named workflow_map name = fromJust (Map.lookup name workflow_map)
+
+-- Parts.
+
 data Part = Part { x :: Int, m :: Int, a :: Int, s :: Int } deriving Show
 
+get_property :: Char -> Part -> Int
+get_property property_char part
+    | property_char == 'x' = x part
+    | property_char == 'm' = m part
+    | property_char == 'a' = a part
+    | property_char == 's' = s part
+
+-- Constraints.
+
+type Constraint = (Int, Int)
+
+data Constraints = Constraints 
+    { cx :: Constraint
+    , cm :: Constraint
+    , ca :: Constraint
+    , cs :: Constraint }
+
+combinations :: Constraints -> Int
+combinations ways =
+    combs (cx ways) * combs (cm ways) * combs (ca ways) * combs (cs ways)
+    where
+        combs (min, max) = maximum [max - min + 1, 0]
+
+-- Main.
+
+main :: IO ()
 main = do
     args <- getArgs
     input <- readFile(args !! 0)
-    let (workflows, parts) = parse_input(lines input)
-    let ns = map (\(Workflow n rs g) -> n) workflows
-    let w_map = Map.fromList (zip ns workflows)
+    let (workflow_map, parts) = parse_input(lines input)
 
-    let answer1 = process_parts w_map parts
-    print(answer1)
+    let a1 = answer1 (get_workflow_named workflow_map) parts
+    print(a1)
 
-    let ans2 = answer2 w_map
-    print(ans2)
+    let a2 = answer2 (get_workflow_named workflow_map)
+    print(a2)
 
-type Range = (Int, Int)
-data Ways = Ways { rx :: Range, rm :: Range, ra :: Range, rs :: Range }
+-- Answer 1.
 
-num_ways :: Ways -> Int
-num_ways ways =
-    num_range (rx ways)
-    * num_range (rm ways)
-    * num_range (ra ways)
-    * num_range (rs ways)
+-- Process each part by evaluating each rule in the workflow to determine
+-- whether it results in ACCEPT (in which case the part contributes the
+-- sum of its properties to the total), REJECT (which contributes nothing),
+-- or the name of the next workflow (in which case continue processing the
+-- part using that workflow).
 
-num_range :: Range -> Int
-num_range (min, max) = maximum [max - min + 1, 0]
+answer1 :: WorkflowGetter -> [Part] -> Int
+answer1 get_workflow = foldl (\s p -> s + process_part get_workflow "in" p) 0 
 
-answer2 w_map = count_ways w_map start_ways "in"
+process_part :: WorkflowGetter -> WorkflowName -> Part -> Int
+process_part get_workflow name part = case next_goto of
+    ACCEPT -> x part + m part + a part + s part
+    REJECT -> 0
+    GotoName next -> process_part get_workflow next part
     where
-        full_range = (1, 4000)
-        start_ways = Ways { rx = full_range, rm = full_range, ra = full_range, rs = full_range }
+        Workflow _ rules default_goto = get_workflow name
+        matched_goto = find isJust (map (eval_rule part) rules)
+        next_goto = fromMaybe default_goto (fromMaybe Nothing matched_goto)
 
-count_ways :: Map.Map WorkflowName Workflow -> Ways -> WorkflowName -> Int
-count_ways w_map cur_ways w_name = count_ways_rule 0 w_map cur_ways default_goto rules
+eval_rule :: Part -> Rule -> Maybe Goto
+eval_rule part (Rule rule_char r_op rule_constant rule_goto) =
+    if predicate then Just rule_goto else Nothing
     where
-        Workflow _ rules default_goto = fromJust (Map.lookup w_name w_map)
-        
-count_ways_rule acc w_map cur_ways def_goto [] = case def_goto of
-    ACCEPT -> acc + num_ways cur_ways
-    REJECT -> acc
-    GotoName name -> acc + (count_ways w_map cur_ways name)
-count_ways_rule acc w_map cur_ways def_goto (rule : rules) = case goto of
-    ACCEPT -> count_ways_rule (acc + num_ways adj_ways) w_map inv_ways def_goto rules
-    REJECT -> count_ways_rule acc w_map inv_ways def_goto rules
-    GotoName name -> (count_ways w_map adj_ways name) + (count_ways_rule acc w_map inv_ways def_goto rules)
+        part_property = get_property rule_char part
+        predicate 
+            | r_op == LESS = part_property < rule_constant
+            | r_op == GREATER = part_property > rule_constant
+
+-- Answer 2.
+
+-- The gist here is that you evaluate each successive rule in the initial
+-- "in" workflow, descending recursively into any child workflows that are
+-- invoked by its gotos and so on. The predicate of each rule constrains its 
+-- child gotos, and the inverse of the rule constrains the next peer rule that
+-- is evaluated which excludes duplicates. Upon reaching an ACCEPT state we 
+-- evaluate how many combinations remain inside the constraints and contribute 
+-- these to the total, REJECT counts nothing.
+
+-- Note: The workflow graph is a tree. The property values of a part do not
+-- change, so any cycle (if formed) would be infinite which is contrary to
+-- the fact that all parts are either accepted or rejected.
+
+answer2 :: WorkflowGetter -> Int
+answer2 get_workflow = count_combs get_workflow initial_constraints "in"
+    where
+        unconstrained = (1, 4000)
+        initial_constraints = Constraints 
+            { cx = unconstrained
+            , cm = unconstrained
+            , ca = unconstrained
+            , cs = unconstrained }
+
+count_combs :: WorkflowGetter -> Constraints -> WorkflowName -> Int
+count_combs get_workflow cur_ways w_name = 
+    count_rule 0 get_workflow cur_ways default_goto rules
+    where
+        Workflow _ rules default_goto = get_workflow w_name
+
+count_rule :: Int -> WorkflowGetter -> Constraints -> Goto -> [Rule] -> Int
+
+count_rule acc get_workflow constraints default_goto [] = 
+    case default_goto of
+        ACCEPT -> acc + combinations constraints
+        REJECT -> acc
+        GotoName name -> acc + (count_combs get_workflow constraints name)
+
+count_rule acc get_workflow constraints default_goto (rule : rules) = 
+    case goto of
+        GotoName name -> sub_combs name + remaining rules
+        _ -> remaining rules
     where
         Rule _ _ _ goto = rule
-        adj_ways = adjust_rule cur_ways rule False
-        inv_ways = adjust_rule cur_ways rule True
+        adj_constraints = adjust_rule constraints rule False
+        inv_constraints = adjust_rule constraints rule True
+        acc' = case goto of
+            ACCEPT -> acc + combinations adj_constraints
+            _ -> acc
+        sub_combs = count_combs get_workflow adj_constraints
+        remaining = count_rule acc' get_workflow inv_constraints default_goto
 
-adjust_rule ways (Rule c op n _) invert
-    | c == 'x' = ways { rx = adjust_range (rx ways) op n invert }
-    | c == 'm' = ways { rm = adjust_range (rm ways) op n invert }
-    | c == 'a' = ways { ra = adjust_range (ra ways) op n invert }
-    | c == 's' = ways { rs = adjust_range (rs ways) op n invert }
+adjust_rule :: Constraints -> Rule -> Bool -> Constraints
+adjust_rule constraints (Rule c op n _) invert
+    | c == 'x' = constraints { cx = narrow (cx constraints) op n invert }
+    | c == 'm' = constraints { cm = narrow (cm constraints) op n invert }
+    | c == 'a' = constraints { ca = narrow (ca constraints) op n invert }
+    | c == 's' = constraints { cs = narrow (cs constraints) op n invert }
 
-adjust_range :: Range -> Operator -> Int -> Bool -> Range
-adjust_range (min, max) operator num invert
+narrow :: Constraint -> Operator -> Int -> Bool -> Constraint
+narrow (min, max) operator num invert
     | (operator == LESS) && (not invert) = (min, minimum [max, num - 1])
     | (operator == GREATER) && (not invert) = (maximum [min, num + 1], max)
     | (operator == LESS) && invert = (maximum [min, num], max)
     | (operator == GREATER) && invert = (min, minimum [max, num])
 
-process_parts w_map = foldl (\s p -> s + process_part w_map p "in") 0 
-
-process_part :: Map.Map WorkflowName Workflow -> Part -> WorkflowName -> Int
-process_part w_map part w_name = case w_next of
-    GotoName next_name -> process_part w_map part next_name
-    ACCEPT -> x part + m part + a part + s part
-    REJECT -> 0
-    where
-        workflow = fromJust (Map.lookup w_name w_map)
-        w_next = apply_workflow part workflow
-
-apply_workflow :: Part -> Workflow -> Goto
-apply_workflow part (Workflow _ rules default_goto) = case matched of
-    Just (Just goto) -> goto
-    Nothing -> default_goto
-    where
-        matched = find isJust (map (apply_rule part) rules)
-
-apply_rule :: Part -> Rule -> Maybe Goto
-apply_rule part (Rule r_char r_op r_num r_goto) =
-    if predicate then Just r_goto else Nothing
-    where
-        p_num
-            | r_char == 'x' = x part
-            | r_char == 'm' = m part
-            | r_char == 'a' = a part
-            | r_char == 's' = s part
-        predicate 
-            | r_op == LESS = p_num < r_num
-            | r_op == GREATER = p_num > r_num
-
 -- Parse input.
 
-parse_input strs = (workflows, parts)
+parse_input :: [String] -> (Map.Map WorkflowName Workflow, [Part])
+parse_input strs = (workflow_map, parts)
     where
         (wstrs, pstrs) = parse_segments strs
         parts = map parse_part pstrs
         workflows = map parse_workflow wstrs
+        names = map (\(Workflow n cs g) -> n) workflows
+        workflow_map = Map.fromList (zip names workflows)
+
+parse_segments :: [String] -> ([String], [String])
+parse_segments strs = (workflows, parts)
+    where
+        (blank_index, _) = (filter (\(n, s) -> s == "") (zip [0..] strs)) !! 0
+        workflows = take blank_index strs
+        parts = drop (blank_index + 1) strs
 
 parse_workflow :: String -> Workflow
 parse_workflow wstr = Workflow name rules default_goto
@@ -121,17 +185,18 @@ parse_workflow wstr = Workflow name rules default_goto
         rules = map parse_rule (init strs)
 
 parse_rule :: String -> Rule
-parse_rule rstr = Rule r_char r_operator r_int r_goto
+parse_rule rstr = Rule rule_char rule_operator rule_int rule_goto
     where
-        (pred_str, goto_s) = split ':' rstr
-        r_char = pred_str !! 0
-        op_char = pred_str !! 1
-        r_operator
+        (predicate_str, goto_s) = split ':' rstr
+        rule_char = predicate_str !! 0
+        op_char = predicate_str !! 1
+        rule_operator
             | op_char == '<' = LESS
             | op_char == '>' = GREATER
-        r_int = read (drop 2 pred_str) :: Int
-        r_goto = parse_goto goto_s
+        rule_int = read (drop 2 predicate_str) :: Int
+        rule_goto = parse_goto goto_s
 
+parse_goto :: String -> Goto
 parse_goto s
     | s == "A" = ACCEPT
     | s == "R" = REJECT
@@ -144,18 +209,9 @@ parse_part pstr = Part { x = x, m = m, a = a, s = s }
         e2 = map (\e -> read (snd (split '=' e)) :: Int) e1
         (x, m, a, s) = (e2 !! 0, e2 !! 1, e2 !! 2, e2 !! 3)
 
-parse_segments strs = (workflows, parts)
-    where
-        (blank_index, _) = (filter (\(n, s) -> s == "") (zip [0..] strs)) !! 0
-        workflows = take blank_index strs
-        parts = drop (blank_index + 1) strs
-
 split :: Char -> String -> (String, String)
 split ch s = (lhs, drop 1 rhs) where (lhs, rhs) = break (== ch) s
 
 splitAll :: Char -> String -> [String]
 splitAll ch "" = []
 splitAll ch s = lhs : (splitAll ch rhs) where (lhs, rhs) = split ch s
-
-removeChar :: Char -> String -> String
-removeChar rem str = filter (rem /=) str
