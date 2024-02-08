@@ -18,4 +18,11 @@ Solving advent of code problems in Haskell.
 |10|⭐️ |
 |11|⭐️⭐️|
 |12|⭐️ |
+|15|⭐️⭐️|
 |16|⭐️⭐️|
+|19|⭐️⭐️|
+|22|⭐️⭐️|
+
+Probably the most difficult solution so far is Day 19 (Aplenty) for which Part 2 was mind-bending.
+
+Also, Day 22 (Sand Slabs) was quite tricky in a 3D-tetris kind of way.
