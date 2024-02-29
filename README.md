@@ -21,6 +21,7 @@ Solving advent of code problems in Haskell.
 |15|⭐️⭐️|
 |16|⭐️⭐️|
 |19|⭐️⭐️|
+|21|⭐️ |
 |22|⭐️⭐️|
 
 Probably the most difficult solution so far is Day 19 (Aplenty) for which Part 2 was mind-bending.
