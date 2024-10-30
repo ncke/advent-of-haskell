@@ -39,7 +39,25 @@ main = do
     let real_box = ((boundary1, boundary1, 0), (boundary2, boundary2, 0))
 
     let a1 = answer1 real_box flatStones
-    print(a1)
+    print a1 
+
+    let ps = pairs [] stones
+    print("number of pairs", length ps)
+    
+    let h0 = stones !! 0
+    let h1 = stones !! 1
+
+    let sub = take 7 ps
+    print("problem", last sub)
+    let (pr1, pr2) = last sub
+    print("problem 1", pr1)
+    print("problem 2", pr2)
+    
+    let vs = map (listVelocities 1) sub
+    print h0
+    print h1
+    print vs
+
 
 -- Answer 1.
 
@@ -70,6 +88,56 @@ intersectionTime h1 h2 = num / den
         ((x2, y2, _), (i2, j2, _)) = h2
         num = (y2 - y1) - ((x2 - x1) * j2) / i2
         den = j1 - (i1 * j2) / i2
+
+-- Answer 2.
+
+pairs :: [Hailstone] -> [Hailstone] -> [(Hailstone, Hailstone)]
+pairs js (h : hs) = [ (h, other) | other <- (js ++ hs) ] ++ (pairs (h : js) hs)
+pairs _ [] = []
+
+remainders :: [Hailstone] -> (Hailstone, Hailstone) -> [Hailstone]
+remainders hs (h1, h2) = filter (\h -> h /= h1 && h /= h2) hs 
+
+aligns :: Int -> Int -> (Hailstone, Hailstone) -> Bool
+aligns ti t (h1, h2) = True
+    where
+        tt = fromIntegral (ti + t)
+        p1 = position h1 tt
+        p2 = position h2 tt
+
+listVelocities :: Int -> (Hailstone, Hailstone) -> [(Int, Int, Int)]
+listVelocities ti (h1, h2) = velocities
+    where
+        ((x1, y1, z1), (i1, j1, k1)) = integralize h1
+        ((x2, y2, z2), (i2, j2, k2)) = integralize h2
+        tn = ti + 1
+        (p1x, p1y, p1z) = (x1 + ti * i1, y1 + ti * j1, z1 + ti * k1)
+        (p2x, p2y, p2z) = (x2 + tn * i2, y2 + tn * j2, z2 + tn * k2)
+        (vx, vy, vz) = (p2x - p1x, p2y - p1y, p2z - p1z)
+        factors = [1] ++ factors3 2 vx vy vz
+        velocity n = (div vx n, div vy n, div vz n)
+        velocities = map velocity factors
+
+factors3 :: Int -> Int -> Int -> Int -> [Int]
+factors3 n a b c =
+    if n > limit then []
+    else (if isFactor then [n] else []) ++ factors3 (n + 1) a b c
+    where
+        limit = min (min a b) c  
+        fa = mod a n == 0
+        fb = mod b n == 0
+        fc = mod c n == 0
+        isFactor = fa && fb && fc
+
+integralize h = ((xi, yi, zi), (ii, ji, ki))
+    where
+        ((x, y, z), (i, j, k)) = h
+        xi = round x
+        yi = round y
+        zi = round z
+        ii = round i
+        ji = round j
+        ki = round k
 
 -- Parse hailstones.
 
