@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 
 if [ "$#" -lt 1 ]; then
     printf "\e[31mpass the advent day as an argument, e.g. 00\e[0m\n"
@@ -33,12 +33,12 @@ set -e
 
 mkdir -p build
 
-ghc -o build/advent ${src[@]} -tmpdir build -outputdir build
+ghc -fforce-recomp -o build/advent ${src[@]} -tmpdir build -outputdir build
 
 printf "\e[32mrun advent  : $aoc\e[0m\n"
-printf "\e[32msource file : ${src[1]}\e[0m\n"
-printf "\e[32minput file  : ${inp[1]}\e[0m\n"
+printf "\e[32msource file : ${src[0]}\e[0m\n"
+printf "\e[32minput file  : ${inp[0]}\e[0m\n"
 
 printf "\e[33m"
-build/advent "${inp[1]}"
+build/advent "${inp[0]}"
 printf "\e[0m"

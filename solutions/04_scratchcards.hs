@@ -8,6 +8,7 @@ main = do
     let cards = lines input
     print (answer1 cards)
     print (answer2 cards)
+    print "hello"
 
 -- Part 1.
 
